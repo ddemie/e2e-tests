@@ -1,6 +1,6 @@
 # Medara E2E Tests
 
-This project contains end-to-end tests for the Medara application using Playwright.
+This project contains end-to-end tests for the Medara application using Playwright. The purpose is to automate testing for account creation, automation and any other e2e testing needed for application. Must have in same folder as front and backend of medara project folder in order to run properly.
 
 ## Features
 
