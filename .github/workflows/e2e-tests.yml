@@ -1,0 +1,98 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Test environment (local or demo)'
+        required: true
+        default: 'demo'
+        type: choice
+        options:
+          - local
+          - demo
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18.x]
+        browser: [chromium, firefox, webkit]
+
+    env:
+      TEST_ENV: ${{ github.event.inputs.environment || 'demo' }}
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: |
+          cd e2e-tests
+          npm ci
+          
+      - name: Install Playwright browsers
+        run: |
+          cd e2e-tests
+          npx playwright install ${{ matrix.browser }} --with-deps
+          
+      # Only needed for local environment testing
+      - name: Checkout frontend repo (local env only)
+        if: env.TEST_ENV == 'local'
+        uses: actions/checkout@v3
+        with:
+          repository: your-org/medara-frontend
+          path: frontend
+          
+      - name: Checkout backend repo (local env only)
+        if: env.TEST_ENV == 'local'
+        uses: actions/checkout@v3
+        with:
+          repository: your-org/medara-backend
+          path: backend
+          
+      - name: Install frontend dependencies (local env only)
+        if: env.TEST_ENV == 'local'
+        run: |
+          cd frontend
+          npm ci
+          
+      - name: Install backend dependencies (local env only)
+        if: env.TEST_ENV == 'local'
+        run: |
+          cd backend
+          npm ci
+          
+      - name: Setup test database (local env only)
+        if: env.TEST_ENV == 'local'
+        run: |
+          cd backend
+          npm run db:setup:test
+          
+      - name: Run Playwright tests
+        env:
+          TEST_ENV: ${{ env.TEST_ENV }}
+        run: |
+          cd e2e-tests
+          npm test -- --project=${{ matrix.browser }}
+          
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-report-${{ matrix.browser }}-${{ env.TEST_ENV }}
+          path: e2e-tests/playwright-report/
+          retention-days: 30
